@@ -3,6 +3,17 @@ name = "pdbinspector"
 version = "0.1.0"
 edition = "2021"
 description = "A tool to inspect and analyze Microsoft PDB (Program Database) files"
+rust-version = "1.75"
+
+[lints.rust]
+unsafe_code = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+# Core safety: no panics in production code
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
 
 [dependencies]
 pdb = "0.8"

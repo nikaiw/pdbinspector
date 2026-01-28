@@ -309,6 +309,9 @@ fn demangle_name(name: &str) -> String {
 fn analyze_pdb(path: &Path, detailed: bool) -> Result<PdbReport> {
     let file = File::open(path).with_context(|| format!("cannot open {:?}", path))?;
 
+    // SAFETY: File is opened read-only and kept open for lifetime of mmap.
+    // The file is not modified during the mmap's lifetime.
+    #[allow(unsafe_code)]
     let mmap = unsafe { MmapOptions::new().map(&file)? };
     let cursor = Cursor::new(&mmap[..]);
 

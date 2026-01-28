@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
 use std::process::Command;
 
 /// Test fixture from getsentry/pdb repository
@@ -108,13 +110,16 @@ fn test_detailed_flag() {
     assert!(report["symbol_details"].is_object());
 
     // Verify detailed lists have content
-    assert!(report["type_details"]["classes"].as_array().unwrap().len() > 0);
-    assert!(report["type_details"]["structs"].as_array().unwrap().len() > 0);
-    assert!(
-        report["symbol_details"]["functions"]
-            .as_array()
-            .unwrap()
-            .len()
-            > 0
-    );
+    assert!(!report["type_details"]["classes"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(!report["type_details"]["structs"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(!report["symbol_details"]["functions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }
