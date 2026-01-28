@@ -13,6 +13,17 @@ A command-line tool to inspect and analyze Microsoft PDB (Program Database) file
 
 ## Installation
 
+### From Releases
+
+Download pre-built binaries from the [Releases](https://github.com/pierreca/pdbinspector/releases) page:
+
+- **Windows**: `pdbinspector-windows-x64.zip`
+- **macOS (Intel)**: `pdbinspector-macos-x64.tar.gz`
+- **macOS (Apple Silicon)**: `pdbinspector-macos-arm64.tar.gz`
+- **Linux**: `pdbinspector-linux-x64.tar.gz`
+
+### From Source
+
 ```bash
 cargo build --release
 ```
@@ -76,6 +87,11 @@ pdbinspector report file.pdb --detailed --format json | jq '[.symbol_details.pub
 # Get symbol counts
 pdbinspector report file.pdb --format json | jq '.symbols'
 ```
+
+## Acknowledgments
+
+- [pdb](https://github.com/getsentry/pdb) - Rust crate for parsing PDB files
+- Test fixtures from the [getsentry/pdb](https://github.com/getsentry/pdb) repository
 
 ## License
 
