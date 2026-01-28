@@ -15,7 +15,7 @@ A command-line tool to inspect and analyze Microsoft PDB (Program Database) file
 
 ### From Releases
 
-Download pre-built binaries from the [Releases](https://github.com/pierreca/pdbinspector/releases) page:
+Download pre-built binaries from the [Releases](https://github.com/nikaiw/pdbinspector/releases) page:
 
 - **Windows**: `pdbinspector-windows-x64.zip`
 - **macOS (Intel)**: `pdbinspector-macos-x64.tar.gz`
