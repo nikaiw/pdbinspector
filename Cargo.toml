@@ -1,9 +1,26 @@
+[workspace]
+members = [".", "wasm"]
+resolver = "2"
+
 [package]
 name = "pdbinspector"
 version = "0.1.0"
 edition = "2021"
 description = "A tool to inspect and analyze Microsoft PDB (Program Database) files"
 rust-version = "1.75"
+
+[lib]
+name = "pdbinspector"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pdbinspector"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+cli = ["dep:clap", "dep:memmap2"]
 
 [lints.rust]
 unsafe_code = "warn"
@@ -22,6 +39,12 @@ serde_json = "1.0"
 rayon = "1.8"
 walkdir = "2.5"
 anyhow = "1.0"
-memmap2 = "0.9"
-clap = { version = "4.4", features = ["derive"] }
+memmap2 = { version = "0.9", optional = true }
+clap = { version = "4.4", features = ["derive"], optional = true }
 msvc-demangler = "0.10"
+
+# WASM build optimization
+[profile.release-wasm]
+inherits = "release"
+opt-level = "s"
+lto = true

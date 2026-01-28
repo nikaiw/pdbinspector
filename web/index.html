@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="color-scheme" content="dark">
+    <title>PDB Inspector - Browser-Based PDB Analysis</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #eaeaea;
+            --text-secondary: #a0a0a0;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --border: #333;
+            --success: #4ade80;
+            --error: #f87171;
+            /* Syntax highlighting colors */
+            --syn-key: #7dd3fc;
+            --syn-string: #86efac;
+            --syn-number: #fcd34d;
+            --syn-bool: #c4b5fd;
+            --syn-null: #a0a0a0;
+            --syn-path: #f9a8d4;
+            --syn-symbol: #93c5fd;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            color-scheme: dark;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-wrap: balance;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+            margin-bottom: 1.5rem;
+        }
+
+        .drop-zone:hover,
+        .drop-zone:focus,
+        .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--bg-tertiary);
+        }
+
+        .drop-zone:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .drop-zone-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .drop-zone-text {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .drop-zone-hint {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        select {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        select:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+
+        /* Status toast - fixed position, no layout shift */
+        .status-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transform: translateX(calc(100% + 1rem));
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .status.visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .status.loading {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .status.success {
+            background: var(--bg-secondary);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status.error {
+            background: var(--bg-secondary);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--text-secondary);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .spinner {
+                animation: none;
+                border-top-color: var(--text-secondary);
+                opacity: 0.7;
+            }
+            .status {
+                transition: opacity 0.1s ease;
+                transform: translateX(0);
+            }
+            .drop-zone,
+            .btn {
+                transition: none;
+            }
+        }
+
+        .output-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .output-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .output-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .output {
+            padding: 1rem;
+            max-height: 600px;
+            overflow: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .output:empty::before {
+            content: 'Drop a PDB file above to analyze it\2026';
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Syntax highlighting */
+        .syn-key { color: var(--syn-key); }
+        .syn-string { color: var(--syn-string); }
+        .syn-number { color: var(--syn-number); }
+        .syn-bool { color: var(--syn-bool); }
+        .syn-null { color: var(--syn-null); }
+        .syn-path { color: var(--syn-path); }
+        .syn-symbol { color: var(--syn-symbol); }
+        .syn-punct { color: var(--text-secondary); }
+
+        .hidden {
+            display: none !important;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        footer a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .control-group {
+                justify-content: space-between;
+            }
+
+            .status-container {
+                left: 1rem;
+                right: 1rem;
+            }
+
+            .status {
+                transform: translateY(-100%);
+            }
+
+            .status.visible {
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Status toast (fixed position) -->
+    <div class="status-container" role="status" aria-live="polite">
+        <div id="status" class="status"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>PDB Inspector</h1>
+            <p class="subtitle">Analyze Microsoft PDB files directly in your browser</p>
+        </header>
+
+        <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="Drop PDB file here or click to browse">
+            <div class="drop-zone-icon" aria-hidden="true">📁</div>
+            <div class="drop-zone-text">Drop PDB file here or click to browse</div>
+            <div class="drop-zone-hint">Supports .pdb files up to 100 MB</div>
+            <input type="file" class="file-input" id="fileInput" accept=".pdb">
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="format">Format:</label>
+                <select id="format">
+                    <option value="text">Text</option>
+                    <option value="json">JSON</option>
+                    <option value="grep">Grep</option>
+                </select>
+            </div>
+
+            <label class="checkbox-wrapper">
+                <input type="checkbox" id="detailed">
+                <span>Detailed output</span>
+            </label>
+
+            <div class="control-group" style="margin-left: auto;">
+                <button class="btn btn-secondary" id="copyBtn" disabled aria-label="Copy output to clipboard">
+                    <span aria-hidden="true">📋</span> Copy
+                </button>
+                <button class="btn btn-secondary" id="downloadBtn" disabled aria-label="Download report as file">
+                    <span aria-hidden="true">⬇️</span> Download
+                </button>
+            </div>
+        </div>
+
+        <div class="output-container">
+            <div class="output-header">
+                <span class="output-title">Analysis Output</span>
+                <span id="fileInfo" class="drop-zone-hint"></span>
+            </div>
+            <pre class="output" id="output" tabindex="0"></pre>
+        </div>
+
+        <footer>
+            <p>
+                Powered by <a href="https://github.com/nikaiw/pdbinspector" target="_blank" rel="noopener">PDB Inspector</a> |
+                <span id="version">Loading WASM…</span>
+            </p>
+        </footer>
+    </div>
+
+    <script type="module">
+        // Import WASM module
+        import init, { analyze_pdb, version } from './pkg/pdbinspector_wasm.js';
+
+        let wasmReady = false;
+        let currentOutput = '';
+        let currentFilename = '';
+        let currentFileData = null;
+        let currentFormat = 'text';
+
+        // DOM elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const formatSelect = document.getElementById('format');
+        const detailedCheckbox = document.getElementById('detailed');
+        const statusEl = document.getElementById('status');
+        const outputEl = document.getElementById('output');
+        const fileInfoEl = document.getElementById('fileInfo');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const versionEl = document.getElementById('version');
+
+        // Initialize WASM
+        async function initWasm() {
+            try {
+                await init();
+                wasmReady = true;
+                versionEl.textContent = `v${version()}`;
+                showStatus('Ready to analyze PDB files', 'success');
+                setTimeout(() => hideStatus(), 2000);
+            } catch (error) {
+                console.error('Failed to initialize WASM:', error);
+                showStatus('Failed to load WASM module. Please refresh the page.', 'error');
+                versionEl.textContent = 'WASM load failed';
+            }
+        }
+
+        function showStatus(message, type = 'loading') {
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = type === 'loading'
+                ? `<div class="spinner" aria-hidden="true"></div><span>${message}</span>`
+                : `<span>${message}</span>`;
+            // Trigger reflow for animation
+            statusEl.offsetHeight;
+            statusEl.classList.add('visible');
+        }
+
+        function hideStatus() {
+            statusEl.classList.remove('visible');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Syntax highlighting for JSON
+        function highlightJson(text) {
+            return text.replace(
+                /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(\b(?:true|false)\b)|(\bnull\b)|(-?\d+\.?\d*(?:[eE][+-]?\d+)?)|([{}\[\],:])/g,
+                (match, key, str, bool, nil, num, punct) => {
+                    if (key) return `<span class="syn-key">${key}</span>:`;
+                    if (str) return `<span class="syn-string">${str}</span>`;
+                    if (bool) return `<span class="syn-bool">${bool}</span>`;
+                    if (nil) return `<span class="syn-null">${nil}</span>`;
+                    if (num) return `<span class="syn-number">${num}</span>`;
+                    if (punct) return `<span class="syn-punct">${punct}</span>`;
+                    return match;
+                }
+            );
+        }
+
+        // Syntax highlighting for grep format (path:symbol)
+        function highlightGrep(text) {
+            return text.split('\n').map(line => {
+                // Match pattern: path:type:name or just symbol names
+                const colonMatch = line.match(/^([^:]+):(.+)$/);
+                if (colonMatch) {
+                    const path = colonMatch[1];
+                    const rest = colonMatch[2];
+                    return `<span class="syn-path">${escapeHtml(path)}</span><span class="syn-punct">:</span><span class="syn-symbol">${escapeHtml(rest)}</span>`;
+                }
+                return escapeHtml(line);
+            }).join('\n');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayOutput(result, format) {
+            currentOutput = result;
+            currentFormat = format;
+
+            if (format === 'json') {
+                outputEl.innerHTML = highlightJson(escapeHtml(result));
+            } else if (format === 'grep') {
+                outputEl.innerHTML = highlightGrep(result);
+            } else {
+                outputEl.textContent = result;
+            }
+        }
+
+        async function analyzeFile(file) {
+            if (!wasmReady) {
+                showStatus('WASM module not ready. Please wait…', 'error');
+                return;
+            }
+
+            if (!file.name.toLowerCase().endsWith('.pdb')) {
+                showStatus('Please select a valid PDB file', 'error');
+                return;
+            }
+
+            if (file.size > 100 * 1024 * 1024) {
+                showStatus('File too large. Maximum size is 100 MB.', 'error');
+                return;
+            }
+
+            currentFilename = file.name;
+            showStatus(`Analyzing ${file.name}…`, 'loading');
+            fileInfoEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
+                currentFileData = data;  // Cache for re-analysis
+                const format = formatSelect.value;
+                const detailed = detailedCheckbox.checked;
+
+                // Run analysis (this may take a moment for large files)
+                const result = analyze_pdb(data, format, detailed);
+
+                displayOutput(result, format);
+
+                copyBtn.disabled = false;
+                downloadBtn.disabled = false;
+
+                showStatus('Analysis complete', 'success');
+                setTimeout(() => hideStatus(), 3000);
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                showStatus(`Analysis failed: ${error}`, 'error');
+                outputEl.textContent = '';
+                currentOutput = '';
+                currentFileData = null;
+                copyBtn.disabled = true;
+                downloadBtn.disabled = true;
+            }
+
+            // Reset file input so same file can be re-selected
+            fileInput.value = '';
+        }
+
+        // Re-analyze when options change
+        async function reanalyze() {
+            if (!currentFileData || !wasmReady) return;
+
+            showStatus(`Re-analyzing ${currentFilename}…`, 'loading');
+
+            try {
+                const format = formatSelect.value;
+                const detailed = detailedCheckbox.checked;
+                const result = analyze_pdb(currentFileData, format, detailed);
+
+                displayOutput(result, format);
+
+                showStatus('Analysis complete', 'success');
+                setTimeout(() => hideStatus(), 2000);
+            } catch (error) {
+                console.error('Re-analysis failed:', error);
+                showStatus(`Analysis failed: ${error}`, 'error');
+            }
+        }
+
+        // Event listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Keyboard accessibility for drop zone
+        dropZone.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) analyzeFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) analyzeFile(file);
+        });
+
+        // Re-analyze when options change
+        formatSelect.addEventListener('change', reanalyze);
+        detailedCheckbox.addEventListener('change', reanalyze);
+
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(currentOutput);
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<span aria-hidden="true">✓</span> Copied';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            } catch (error) {
+                showStatus('Failed to copy to clipboard', 'error');
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const format = formatSelect.value;
+            const extension = format === 'json' ? 'json' : 'txt';
+            const basename = currentFilename.replace(/\.pdb$/i, '');
+            const filename = `${basename}_report.${extension}`;
+
+            const blob = new Blob([currentOutput], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // Initialize
+        initWasm();
+    </script>
+</body>
+</html>

@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
+use pdbinspector::OutputFormat;
 use std::path::PathBuf;
-
-mod report;
 
 #[derive(Parser)]
 #[command(name = "pdbinspector")]
@@ -40,12 +39,12 @@ enum OutputFormatArg {
     Grep,
 }
 
-impl From<OutputFormatArg> for report::OutputFormat {
+impl From<OutputFormatArg> for OutputFormat {
     fn from(arg: OutputFormatArg) -> Self {
         match arg {
-            OutputFormatArg::Text => report::OutputFormat::Text,
-            OutputFormatArg::Json => report::OutputFormat::Json,
-            OutputFormatArg::Grep => report::OutputFormat::Grep,
+            OutputFormatArg::Text => OutputFormat::Text,
+            OutputFormatArg::Json => OutputFormat::Json,
+            OutputFormatArg::Grep => OutputFormat::Grep,
         }
     }
 }
@@ -61,7 +60,7 @@ fn main() -> Result<()> {
             detailed,
             mangled,
         } => {
-            report::run(pdb_file, output, format.into(), detailed, !mangled)?;
+            pdbinspector::run(pdb_file, output, format.into(), detailed, !mangled)?;
         }
     }
 

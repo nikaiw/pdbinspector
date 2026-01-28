@@ -1,14 +1,13 @@
 use anyhow::{Context, Result};
-use memmap2::MmapOptions;
 use msvc_demangler::{demangle, DemangleFlags};
 use pdb::{ClassKind, FallibleIterator, SymbolData, TypeData, PDB};
 use serde::Serialize;
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::Cursor,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, io::Cursor, path::Path};
+
+#[cfg(feature = "cli")]
+use memmap2::MmapOptions;
+#[cfg(feature = "cli")]
+use std::{fs::File, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -306,6 +305,23 @@ fn demangle_name(name: &str) -> String {
     }
 }
 
+/// Analyze a PDB file from raw bytes.
+///
+/// This is the main entry point for WASM and other non-CLI use cases.
+///
+/// # Arguments
+/// * `data` - The raw bytes of the PDB file
+/// * `detailed` - If true, include detailed lists of types and symbols
+///
+/// # Returns
+/// A `PdbReport` containing the analysis results
+pub fn analyze_pdb_from_bytes(data: &[u8], detailed: bool) -> Result<PdbReport> {
+    let cursor = Cursor::new(data);
+    let mut pdb = PDB::open(cursor).context("invalid PDB")?;
+    analyze_pdb_inner(&mut pdb, "<bytes>", detailed)
+}
+
+#[cfg(feature = "cli")]
 fn analyze_pdb(path: &Path, detailed: bool) -> Result<PdbReport> {
     let file = File::open(path).with_context(|| format!("cannot open {:?}", path))?;
 
@@ -316,9 +332,18 @@ fn analyze_pdb(path: &Path, detailed: bool) -> Result<PdbReport> {
     let cursor = Cursor::new(&mmap[..]);
 
     let mut pdb = PDB::open(cursor).context("invalid PDB")?;
+    let mut report = analyze_pdb_inner(&mut pdb, &path.display().to_string(), detailed)?;
+    report.file_path = path.display().to_string();
+    Ok(report)
+}
 
+fn analyze_pdb_inner<'s, S: pdb::Source<'s> + 's>(
+    pdb: &mut PDB<'s, S>,
+    file_path: &str,
+    detailed: bool,
+) -> Result<PdbReport> {
     let mut report = PdbReport {
-        file_path: path.display().to_string(),
+        file_path: file_path.to_string(),
         status: "ok".into(),
         ..Default::default()
     };
@@ -1064,7 +1089,26 @@ fn format_grep_report(report: &PdbReport, no_mangled: bool) -> String {
     output
 }
 
+/// Format a PdbReport into a string based on the output format.
+///
+/// # Arguments
+/// * `report` - The PDB report to format
+/// * `format` - The output format (Text, Json, or Grep)
+/// * `no_mangled` - If true, hide mangled names in output
+///
+/// # Returns
+/// A formatted string representation of the report
+pub fn format_report(report: &PdbReport, format: OutputFormat, no_mangled: bool) -> String {
+    match format {
+        OutputFormat::Text => format_text_report(report, no_mangled),
+        OutputFormat::Json => serde_json::to_string_pretty(report)
+            .unwrap_or_else(|e| format!("{{\"error\": \"JSON serialization failed: {}\"}}", e)),
+        OutputFormat::Grep => format_grep_report(report, no_mangled),
+    }
+}
+
 /// Generate a report for a single PDB file
+#[cfg(feature = "cli")]
 pub fn run(
     pdb_file: PathBuf,
     output: Option<PathBuf>,
@@ -1082,11 +1126,7 @@ pub fn run(
         },
     };
 
-    let output_str = match format {
-        OutputFormat::Text => format_text_report(&report, no_mangled),
-        OutputFormat::Json => serde_json::to_string_pretty(&report)?,
-        OutputFormat::Grep => format_grep_report(&report, no_mangled),
-    };
+    let output_str = format_report(&report, format, no_mangled);
 
     if let Some(out_path) = output {
         std::fs::write(&out_path, &output_str)?;
