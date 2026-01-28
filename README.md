@@ -2,6 +2,8 @@
 
 A command-line tool to inspect and analyze Microsoft PDB (Program Database) files.
 
+**[Try it online](https://nikaiw.github.io/pdbinspector/)** (WebAssembly)
+
 ## Features
 
 - Extract type information (structs, classes, enums, unions)
